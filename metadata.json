@@ -1,0 +1,8 @@
+{
+  "name": "DOLA AI",
+  "description": "Executive Assistant Platform — Premium dark theme PWA personal assistant with intelligent productivity and financial health tools.",
+  "requestFramePermissions": [
+    "notifications"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

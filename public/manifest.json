@@ -1,0 +1,25 @@
+{
+  "name": "DOLA AI — Executive Assistant",
+  "short_name": "DOLA AI",
+  "description": "Executive Assistant Platform with Premium Dark Theme and financial management integrations.",
+  "theme_color": "#0A0A0F",
+  "background_color": "#0A0A0F",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=192&h=192&q=80",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=512&h=512&q=80",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,439 @@
+// ============================================
+// DOLA AI — Executive Assistant
+// Arquivo: prisma/schema.prisma
+// Fase: 1
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- USUÁRIOS ----
+model User {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  password     String        // Hash bcrypt — NUNCA texto puro
+  role         Role          @default(USER)
+  avatar       String?
+  phone        String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  
+  // Relações
+  tasks        Task[]
+  events       Event[]
+  alarms       Alarm[]
+  habits       Habit[]
+  finances     Finance[]
+  familyEvents FamilyEvent[]
+  notes        Note[]
+  notifications Notification[]
+  activityLogs ActivityLog[]
+  investments  Investment[]
+  investGoals  InvestmentGoal[]
+  loans        Loan[]
+}
+
+// ---- TAREFAS ----
+model Task {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      TaskStatus @default(TODO)
+  priority    Priority   @default(MEDIUM)
+  category    String?    // Família, Negócios, Espiritual, etc.
+  dueDate     DateTime?
+  completedAt DateTime?
+  parentId    String?    // Para subtarefas
+  parent      Task?      @relation("SubTasks", fields: [parentId], references: [id])
+  subtasks    Task[]     @relation("SubTasks")
+  order       Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([userId])
+}
+
+// ---- EVENTOS / AGENDA ----
+model Event {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  startDate      DateTime
+  endDate        DateTime?
+  location       String?
+  type           EventType @default(PERSONAL)
+  isRecurring    Boolean   @default(false)
+  recurrenceRule String?   // iCal RRULE format
+  reminder       Int?      // Minutos antes para lembrar
+  color          String?   @default("#6C5CE7")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ---- ALARMES ----
+model Alarm {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  datetime    DateTime
+  repeat      String?  // "DAILY" | "WEEKLY" | "CUSTOM"
+  sound       String?
+  priority    Priority @default(MEDIUM)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---- HÁBITOS ----
+model Habit {
+  id          String         @id @default(cuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  frequency   HabitFrequency @default(DAILY)
+  category    String?
+  icon        String?
+  color       String?        @default("#6C5CE7")
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  logs        HabitLog[]
+
+  @@index([userId])
+}
+
+model HabitLog {
+  id        String   @id @default(cuid())
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime
+  completed Boolean  @default(false)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  @@index([habitId])
+}
+
+// ---- FINANCEIRO ----
+model Finance {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       FinanceType
+  title      String
+  amount     Decimal     @db.Decimal(15, 2)
+  category   String?
+  dueDate    DateTime?
+  paidAt     DateTime?
+  isPaid     Boolean     @default(false)
+  recurrence String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  @@index([userId])
+}
+
+// ---- FAMÍLIA ----
+model FamilyEvent {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title        String
+  description  String?
+  date         DateTime
+  type         String?
+  participants String[] // Array de nomes
+  reminder     Int?     // Dias antes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---- NOTAS ----
+model Note {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  content   String?
+  category  String?
+  isPinned  Boolean  @default(false)
+  color     String?  @default("#12121A")
+  tags      String[] // Array de tags
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ---- INVESTIMENTOS ----
+model Investment {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name           String         // Ex: "Tesouro Selic 2029"
+  type           InvestmentType
+  profile        InvestorProfile
+  institution    String?        // Nubank, XP, BTG, etc.
+  initialAmount  Decimal        @db.Decimal(15, 2)
+  currentAmount  Decimal        @db.Decimal(15, 2)
+  monthlyDeposit Decimal?       @db.Decimal(15, 2)
+  startDate      DateTime
+  maturityDate   DateTime?      // Vencimento (se houver)
+  expectedReturn Decimal?       @db.Decimal(5, 2) // % ao ano esperado
+  actualReturn   Decimal?       @db.Decimal(5, 2) // % real acumulada
+  riskLevel      RiskLevel
+  isActive       Boolean        @default(true)
+  notes          String?
+  color          String?        @default("#6C5CE7")
+  icon           String?
+  logs           InvestmentLog[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+model InvestmentLog {
+  id           String     @id @default(cuid())
+  investmentId String
+  investment   Investment @relation(fields: [investmentId], references: [id], onDelete: Cascade)
+  date         DateTime
+  amount       Decimal    @db.Decimal(15, 2) // Valor naquele dia
+  deposit      Decimal?   @db.Decimal(15, 2) // Aporte feito
+  withdrawal   Decimal?   @db.Decimal(15, 2) // Resgate feito
+  returnRate   Decimal?   @db.Decimal(5, 4) // % de retorno no período
+  notes        String?
+  createdAt    DateTime   @default(now())
+
+  @@index([investmentId])
+}
+
+model InvestmentGoal {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String    // Ex: "Aposentadoria", "Casa própria"
+  targetAmount  Decimal   @db.Decimal(15, 2)
+  currentAmount Decimal   @db.Decimal(15, 2) @default(0)
+  targetDate    DateTime
+  monthlyNeeded Decimal?  @db.Decimal(15, 2) // Calculado automaticamente
+  color         String?   @default("#00D2FF")
+  isCompleted   Boolean   @default(false)
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+// ---- EMPRÉSTIMOS ----
+model Loan {
+  id                 String         @id @default(cuid())
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name               String         // Ex: "Financiamento Carro"
+  institution        String         // Banco/Financeira
+  type               LoanType
+  totalAmount        Decimal        @db.Decimal(15, 2) // Valor original
+  remainingAmount    Decimal        @db.Decimal(15, 2) // Saldo devedor atual
+  interestRate       Decimal        @db.Decimal(5, 4) // % ao mês
+  interestRateYear   Decimal        @db.Decimal(5, 2) // % ao ano (calculado)
+  installmentValue   Decimal        @db.Decimal(15, 2) // Valor da parcela
+  totalInstallments  Int
+  paidInstallments   Int            @default(0)
+  startDate          DateTime
+  endDate            DateTime       // Previsão de quitação
+  nextDueDate        DateTime       // Próximo vencimento
+  status             LoanStatus     @default(ACTIVE)
+  hasPortability     Boolean        @default(false)
+  penaltyAmount      Decimal?       @db.Decimal(15, 2) // Multa por atraso
+  earlyPaymentFee    Decimal?       @db.Decimal(5, 2)  // % multa por antecipar
+  notes              String?
+  color              String?        @default("#FF5252")
+  payments           LoanPayment[]
+  strategies         LoanStrategy[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([userId])
+}
+
+model LoanPayment {
+  id             String    @id @default(cuid())
+  loanId         String
+  loan           Loan      @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  installmentNum Int       // Número da parcela
+  dueDate        DateTime
+  paidDate       DateTime?
+  scheduledAmount Decimal   @db.Decimal(15, 2)
+  paidAmount     Decimal?  @db.Decimal(15, 2)
+  fineAmount     Decimal?  @db.Decimal(15, 2) // Multa se atrasou
+  isPaid         Boolean   @default(false)
+  isExtraPayment Boolean   @default(false)    // Pagamento extra/antecipação
+  notes          String?
+  createdAt      DateTime  @default(now())
+
+  @@index([loanId])
+}
+
+model LoanStrategy {
+  id             String       @id @default(cuid())
+  loanId         String
+  loan           Loan         @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  strategyType   StrategyType
+  title          String
+  description    String
+  potentialSaving Decimal?     @db.Decimal(15, 2)
+  monthsSaved    Int?
+  priority       Int          @default(1) // 1 = mais urgente
+  isApplied      Boolean      @default(false)
+  appliedAt      DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([loanId])
+}
+
+// ---- NOTIFICAÇÕES ----
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   // "TASK" | "EVENT" | "ALARM" | "FINANCE" | "LOAN" | "SYSTEM"
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---- LOGS DE ATIVIDADE ----
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String   // "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGOUT"
+  entity    String   // "Task" | "Event" | "Investment" | etc.
+  entityId  String?
+  details   String?  // JSON com detalhes da ação
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---- ENUMS ----
+enum Role {
+  SUPERADMIN
+  ADMIN
+  USER
+}
+
+enum TaskStatus {
+  TODO
+  DOING
+  DONE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum EventType {
+  PERSONAL
+  BUSINESS
+  FAMILY
+  FINANCIAL
+  HEALTH
+}
+
+enum HabitFrequency {
+  DAILY
+  WEEKLY
+}
+
+enum FinanceType {
+  INCOME
+  EXPENSE
+  PAYABLE
+  RECEIVABLE
+}
+
+enum InvestmentType {
+  RENDA_FIXA     // CDB, Tesouro, LCI, LCA
+  RENDA_VARIAVEL // Ações, ETFs, BDRs
+  FUNDOS         // Fundos de investimento
+  CRIPTOMOEDAS   // Bitcoin, Ethereum, etc.
+  IMOVEIS        // Fundos Imobiliários, imóveis físicos
+  PREVIDENCIA    // PGBL, VGBL
+  POUPANCA       // Poupança
+  OUTRO
+}
+
+enum InvestorProfile {
+  CONSERVADOR // Baixo risco, renda fixa
+  MODERADO    // Misto renda fixa + variável
+  ARROJADO    // Alta exposição renda variável
+  SOFISTICADO // Derivativos, internacionais
+}
+
+enum RiskLevel {
+  BAIXO
+  MEDIO
+  ALTO
+  MUITO_ALTO
+}
+
+enum LoanType {
+  PESSOAL            // Empréstimo pessoal
+  CONSIGNADO         // Descontado em folha
+  CARTAO_CREDITO     // Dívida cartão
+  FINANCIAMENTO_AUTO  // Carro
+  FINANCIAMENTO_IMOVEL // Casa/apartamento
+  CHEQUE_ESPECIAL
+  EMPRESARIAL
+  OUTRO
+}
+
+enum LoanStatus {
+  ACTIVE       // Em dia
+  OVERDUE      // Atrasado
+  PAID         // Quitado
+  RENEGOCIATED // Renegociado
+}
+
+enum StrategyType {
+  AMORTIZACAO_EXTRA   // Pagar parcelas extras
+  PORTABILIDADE       // Transferir para banco menor juros
+  REFINANCIAMENTO     // Renegociar taxas
+  BOLA_DE_NEVE        // Pagar menor dívida primeiro
+  AVALANCHE           // Pagar maior juros primeiro
+  ANTECIPACAO_PARCELAS // Antecipar parcelas
+  FGTS                // Usar FGTS (imóveis)
+  RENEGOCIACAO        // Negociar diretamente
+}
