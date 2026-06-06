@@ -50,9 +50,14 @@ app.use("/api", async (req, res, next) => {
 // ---- BANCO DE DADOS EM ARQUIVO (LITE JSON DATABASE) ----
 const DB_FILE = path.join(process.cwd(), "data", "db.json");
 
-// Garante que a pasta 'data' existe
-if (!fs.existsSync(path.join(process.cwd(), "data"))) {
-  fs.mkdirSync(path.join(process.cwd(), "data"), { recursive: true });
+// Garante que a pasta 'data' existe (failsafe para ambientes sandbox/serverless)
+try {
+  const dataDir = path.join(process.cwd(), "data");
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+} catch (e) {
+  console.warn("Failsafe: Não foi possível criar pasta 'data' no ambiente de execução (normal em Vercel/Serverless):", e);
 }
 
 // Interface simplificada da base local do servidor
