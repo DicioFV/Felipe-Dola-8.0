@@ -8,8 +8,8 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from "@supabase/supabase-js";
 
 // polyfill para garantir que crypto.randomUUID sempre exista e seja seguro em qualquer versão de Node
 if (typeof (crypto as any).randomUUID !== "function") {
@@ -26,6 +26,26 @@ export const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// ---- CONFIGURAÇÃO E INTEGRAÇÃO DO SUPABASE ----
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+
+let supabase: any = null;
+if (supabaseUrl && supabaseKey) {
+  console.log("Supabase: Credenciais detectadas! Ativando modo de banco de dados em nuvem persistente.");
+  supabase = createClient(supabaseUrl, supabaseKey);
+} else {
+  console.log("Supabase: Credenciais não encontradas. Executando em modo local (db.json/cache).");
+}
+
+// Middleware para interceptar todas as chamadas da API e carregar do Supabase se necessário
+app.use("/api", async (req, res, next) => {
+  if (supabase) {
+    await syncFromSupabase();
+  }
+  next();
+});
 
 // ---- BANCO DE DADOS EM ARQUIVO (LITE JSON DATABASE) ----
 const DB_FILE = path.join(process.cwd(), "data", "db.json");
@@ -77,6 +97,70 @@ const initialDb: LocalDB = {
 };
 
 let dbInMemoryCache: LocalDB | null = null;
+let isSaving = false;
+let saveQueue: LocalDB | null = null;
+
+async function syncFromSupabase() {
+  if (!supabase) return;
+  try {
+    const { data: row, error } = await supabase
+      .from("dola_db_store")
+      .select("data")
+      .eq("id", "global")
+      .maybeSingle();
+
+    if (error) {
+      console.warn("Erro ao buscar dados do Supabase:", error);
+      return;
+    }
+
+    if (row && row.data) {
+      dbInMemoryCache = row.data;
+    } else {
+      // Se não houver registro no banco ainda, cria com o modelo limpo inicial
+      console.log("Supabase: Criando registro inicial em nuvem...");
+      const dbToSave = dbInMemoryCache || readDb();
+      const { error: insertError } = await supabase
+        .from("dola_db_store")
+        .insert([{ id: "global", data: dbToSave }]);
+      if (insertError) {
+        console.warn("Erro ao inserir registro inicial no Supabase:", insertError);
+      } else {
+        dbInMemoryCache = dbToSave;
+      }
+    }
+  } catch (e) {
+    console.error("Exceção na sincronização de entrada do Supabase:", e);
+  }
+}
+
+async function syncToSupabase(db: LocalDB) {
+  if (!supabase) return;
+  if (isSaving) {
+    saveQueue = db;
+    return;
+  }
+  isSaving = true;
+  try {
+    const { error } = await supabase
+      .from("dola_db_store")
+      .update({ data: db, updated_at: new Date().toISOString() })
+      .eq("id", "global");
+    
+    if (error) {
+      console.error("Erro ao salvar dados no Supabase:", error);
+    }
+  } catch (e) {
+    console.error("Exceção na sincronização de saída do Supabase:", e);
+  } finally {
+    isSaving = false;
+    if (saveQueue) {
+      const nextDb = saveQueue;
+      saveQueue = null;
+      await syncToSupabase(nextDb);
+    }
+  }
+}
 
 function readDb(): LocalDB {
   if (dbInMemoryCache) {
@@ -112,6 +196,11 @@ function writeDb(db: LocalDB) {
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
   } catch (err) {
     console.warn("Failsafe: Gravação no arquivo db.json falhou (esperado em Vercel/Serverless pois o sistema de arquivos é de apenas leitura):", err);
+  }
+  if (supabase) {
+    syncToSupabase(db).catch(err => {
+      console.error("Erro ao enviar dados para o Supabase de forma assíncrona:", err);
+    });
   }
 }
 
@@ -2179,6 +2268,7 @@ app.post("/api/data/import", authenticateToken, (req: any, res) => {
 // ---- SERVIR O VITE ----
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
