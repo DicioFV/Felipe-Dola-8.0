@@ -31,7 +31,7 @@ export function LoginPage() {
     try {
       await login(cleanName);
       
-      if (cleanName.toLowerCase() === "adminfelipe") {
+      if (cleanName.toLowerCase() === "adminfelipe020821") {
         toast("Acesso de Administrador Felipe concedido! Permissões de edição completa ativas.", "success");
       } else {
         toast(`Bem-vindo ao seu workspace individual: ${cleanName}! Sincronismo ativo.`, "success");
@@ -45,7 +45,7 @@ export function LoginPage() {
   };
 
   const handleQuickAdmin = () => {
-    setName("adminfelipe");
+    setName("adminfelipe020821");
     toast("Identificador de Administrador preenchido! Clique em acessar.", "info");
   };
 
@@ -92,7 +92,7 @@ export function LoginPage() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="Ex: felipe ou adminfelipe"
+                    placeholder="Ex: felipe, beatriz ou sua-chave"
                     className="w-full rounded-lg bg-[#141424] border border-white/[0.06] hover:border-white/12 focus:border-purple-500/80 pl-10 pr-3.5 py-2.5 text-sm text-[#F1F1F3] placeholder-[#8888A0]/40 transition-colors outline-none focus:ring-2 focus:ring-purple-500/10"
                     disabled={loading}
                     autoFocus
@@ -134,7 +134,7 @@ export function LoginPage() {
               className="w-full flex items-center justify-center gap-2 bg-[#1A1A2E]/50 hover:bg-[#25253F]/60 text-xs font-semibold text-[#8888A0] hover:text-[#F1F1F3] border border-white/[0.04] p-2.5 rounded-lg transition-all cursor-pointer"
             >
               <Terminal size={14} className="text-[#00D2FF]" />
-              Identificar-se como adminfelipe (Acesso Completo)
+              Identificar-se como adminfelipe020821 (Acesso Completo)
             </button>
           </CardContent>
         </Card>

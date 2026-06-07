@@ -343,18 +343,18 @@ app.post("/api/auth/login", (req, res) => {
   const db = readDb();
   let user: any = null;
 
-  // Analisa se o nome é adminfelipe para privilégios de superadmin
-  const isAdminFelipe = inputName.toLowerCase() === "adminfelipe";
+  // Analisa se o nome é adminfelipe020821 para privilégios de superadmin
+  const isAdminFelipe = inputName.toLowerCase() === "adminfelipe020821";
 
   if (isAdminFelipe) {
-    // Procura por adminfelipe ou role SUPERADMIN no banco
-    user = db.users.find(u => u.name.toLowerCase() === "adminfelipe" || u.role === "SUPERADMIN");
+    // Procura por adminfelipe020821 ou role SUPERADMIN no banco
+    user = db.users.find(u => u.name.toLowerCase() === "adminfelipe020821" || u.role === "SUPERADMIN");
     if (!user) {
-      // Se não existir, autocadastra o superadmin adminfelipe
+      // Se não existir, autocadastra o superadmin adminfelipe020821
       user = {
         id: "superadmin-01",
-        name: "adminfelipe",
-        email: "adminfelipe@dola.ai",
+        name: "adminfelipe020821",
+        email: "adminfelipe020821@dola.ai",
         password: hashPassword("123456"),
         role: "SUPERADMIN",
         isActive: true,
@@ -370,7 +370,7 @@ app.post("/api/auth/login", (req, res) => {
       let updated = false;
       if (user.role !== "SUPERADMIN") { user.role = "SUPERADMIN"; updated = true; }
       if (!user.isActive) { user.isActive = true; updated = true; }
-      if (user.name !== "adminfelipe") { user.name = "adminfelipe"; updated = true; }
+      if (user.name !== "adminfelipe020821") { user.name = "adminfelipe020821"; updated = true; }
       if (updated) {
         const uIndex = db.users.findIndex(u => u.id === user.id);
         if (uIndex !== -1) db.users[uIndex] = user;
@@ -409,14 +409,14 @@ app.post("/api/auth/login", (req, res) => {
 
   const token = generateToken(user);
   
-  // Registrar log de login para auditoria
+  // Registrar log de login para auditoria (com detecção segura de IP em serverless)
   logActivity(
     user.id, 
     "LOGIN", 
     "User", 
     user.id, 
     `Executivo ${user.name} acessou a plataforma via login simplificado por nome. Sincronismo ativo.`, 
-    (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress
+    (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || ""
   );
 
   // Retorna dados do usuário sem a senha
@@ -672,7 +672,7 @@ app.post("/api/tasks", authenticateToken, (req: any, res) => {
   };
   db.tasks.push(newTask);
   writeDb(db);
-  logActivity(req.user.id, "CREATE", "Task", newTask.id, `Tarefa "${newTask.title}" foi criada. Prioridade: ${newTask.priority}.`, (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress);
+  logActivity(req.user.id, "CREATE", "Task", newTask.id, `Tarefa "${newTask.title}" foi criada. Prioridade: ${newTask.priority}.`, (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || "");
   res.status(201).json(newTask);
 });
 
@@ -693,7 +693,7 @@ app.put("/api/tasks/:id", authenticateToken, (req: any, res) => {
   
   task.updatedAt = new Date().toISOString();
   writeDb(db);
-  logActivity(req.user.id, "UPDATE", "Task", task.id, `Tarefa "${task.title}" foi atualizada. Status: ${task.status}.`, (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress);
+  logActivity(req.user.id, "UPDATE", "Task", task.id, `Tarefa "${task.title}" foi atualizada. Status: ${task.status}.`, (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || "");
   res.json(task);
 });
 
@@ -703,7 +703,7 @@ app.delete("/api/tasks/:id", authenticateToken, (req: any, res) => {
   db.tasks = db.tasks.filter(t => !(t.id === req.params.id && t.userId === req.user.id));
   if (db.tasks.length === initialLength) return res.status(404).json({ message: "Tarefa não encontrada." });
   writeDb(db);
-  logActivity(req.user.id, "DELETE", "Task", req.params.id, `Tarefa ID "${req.params.id}" foi removida do ecossistema.`, (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress);
+  logActivity(req.user.id, "DELETE", "Task", req.params.id, `Tarefa ID "${req.params.id}" foi removida do ecossistema.`, (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || "");
   res.json({ success: true });
 });
 
@@ -2052,7 +2052,7 @@ app.post("/api/activity-logs/clear", authenticateToken, (req: any, res) => {
     "System",
     null,
     "Limpeza consolidada da trilha de auditoria efetuada na conta superadmin.",
-    (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress
+    (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || ""
   );
 
   res.json({ success: true, message: "Trilha de auditoria reiniciada com sucesso." });
@@ -2144,7 +2144,7 @@ app.get("/api/data/export", authenticateToken, (req: any, res) => {
       "System", 
       null, 
       "Backup e exportação completa dos dados do usuário executados nos formatos do sistema.", 
-      (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress
+      (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || ""
     );
 
     res.json(exportData);
@@ -2313,7 +2313,7 @@ app.post("/api/data/import", authenticateToken, (req: any, res) => {
       "System",
       null,
       `Restauração completa de backup efetuada pelo executivo.`,
-      (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress
+      (req.headers["x-forwarded-for"] as string) || req.socket?.remoteAddress || req.ip || ""
     );
 
     res.json({
