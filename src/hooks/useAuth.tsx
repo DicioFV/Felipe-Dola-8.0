@@ -10,7 +10,7 @@ import { User } from "@/src/types";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<User>;
+  login: (name: string) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -64,7 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const login = useCallback(async (email: string, pass: string) => {
+  const login = useCallback(async (name: string) => {
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
@@ -72,12 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password: pass }),
+        body: JSON.stringify({ name }),
       });
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.message || "E-mail ou senha inválidos.");
+        throw new Error(errJson.message || "Falha ao acessar com o nome informado.");
       }
 
       const { token, user: userData } = await res.json();

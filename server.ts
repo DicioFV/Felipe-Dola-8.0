@@ -331,35 +331,93 @@ function authenticateToken(req: any, res: any, next: any) {
 
 // ---- API ENDPOINTS ----
 
-// LOGIN Oculto / Geral
+// LOGIN Sem Senha / Auto-registro por Nome
 app.post("/api/auth/login", (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ message: "E-mail e senha são obrigatórios." });
+  const { name, email } = req.body;
+  const inputName = (name || email || "").trim();
+  
+  if (!inputName) {
+    return res.status(400).json({ message: "O nome / identificador de acesso é obrigatório." });
   }
-
-  const cleanEmail = email.trim().toLowerCase();
-  const cleanPassword = password.trim();
 
   const db = readDb();
-  const user = db.users.find(u => u.email.trim().toLowerCase() === cleanEmail);
+  let user: any = null;
 
-  if (!user) {
-    return res.status(401).json({ message: "Usuário não encontrado." });
-  }
+  // Analisa se o nome é adminfelipe para privilégios de superadmin
+  const isAdminFelipe = inputName.toLowerCase() === "adminfelipe";
 
-  if (user.password !== hashPassword(cleanPassword)) {
-    return res.status(401).json({ message: "Senha incorreta." });
-  }
-
-  if (!user.isActive) {
-    return res.status(403).json({ message: "Sua conta está inativa. Contate o administrador." });
+  if (isAdminFelipe) {
+    // Procura por adminfelipe ou role SUPERADMIN no banco
+    user = db.users.find(u => u.name.toLowerCase() === "adminfelipe" || u.role === "SUPERADMIN");
+    if (!user) {
+      // Se não existir, autocadastra o superadmin adminfelipe
+      user = {
+        id: "superadmin-01",
+        name: "adminfelipe",
+        email: "adminfelipe@dola.ai",
+        password: hashPassword("123456"),
+        role: "SUPERADMIN",
+        isActive: true,
+        avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80",
+        phone: "+55 11 99999-9999",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.users.push(user);
+      writeDb(db);
+    } else {
+      // Garante integridade das propriedades do adminfelipe
+      let updated = false;
+      if (user.role !== "SUPERADMIN") { user.role = "SUPERADMIN"; updated = true; }
+      if (!user.isActive) { user.isActive = true; updated = true; }
+      if (user.name !== "adminfelipe") { user.name = "adminfelipe"; updated = true; }
+      if (updated) {
+        const uIndex = db.users.findIndex(u => u.id === user.id);
+        if (uIndex !== -1) db.users[uIndex] = user;
+        writeDb(db);
+      }
+    }
+  } else {
+    // Procura pelo nome digitado de forma case-insensitive
+    user = db.users.find(u => u.name.trim().toLowerCase() === inputName.toLowerCase());
+    
+    if (!user) {
+      // Se não existir, autocadastra o usuário instantaneamente de forma persistente!
+      user = {
+        id: `user-${crypto.randomUUID()}`,
+        name: inputName,
+        email: `${inputName.toLowerCase()}@dola.ai`,
+        password: hashPassword("123456"),
+        role: "USER",
+        isActive: true,
+        avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      db.users.push(user);
+      writeDb(db);
+    } else {
+      // Caso já exista, assegura que está ativo
+      if (!user.isActive) {
+        user.isActive = true;
+        const uIndex = db.users.findIndex(u => u.id === user.id);
+        if (uIndex !== -1) db.users[uIndex] = user;
+        writeDb(db);
+      }
+    }
   }
 
   const token = generateToken(user);
   
-  // Registrar log de login com segurança
-  logActivity(user.id, "LOGIN", "User", user.id, `Executivo ${user.name} iniciou sessão na plataforma.`, (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress);
+  // Registrar log de login para auditoria
+  logActivity(
+    user.id, 
+    "LOGIN", 
+    "User", 
+    user.id, 
+    `Executivo ${user.name} acessou a plataforma via login simplificado por nome. Sincronismo ativo.`, 
+    (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress
+  );
 
   // Retorna dados do usuário sem a senha
   const { password: _, ...userWithoutPassword } = user;
